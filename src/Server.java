@@ -1,7 +1,6 @@
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.text.MessageFormat;
 import java.util.Scanner;
 
 public class Server extends Thread {
@@ -36,9 +35,10 @@ public class Server extends Thread {
             while (saida.hasNextLine()) {
                 String input = saida.nextLine();
 
-                String command = Command.getCommandFromUserInput(input);
+                String commandType = new Command(input)
+                    .getType();
 
-                switch (command) {
+                switch (commandType) {
                     case "/users":
                         break;
                     case "/send message":

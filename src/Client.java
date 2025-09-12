@@ -13,14 +13,15 @@ public class Client {
         var teclado = new Scanner(System.in);
         var saida = new PrintStream(socket.getOutputStream());
 
-        while (teclado.hasNextLine()) {
+        while (socket.isConnected()) {
             String input = teclado.nextLine();
 
             saida.println(input);
 
-            String command = Command.getCommandFromUserInput(input);
+            String commandType = new Command(input)
+                .getType();
 
-            switch (command) {
+            switch (commandType) {
                 case "/users":
                     break;
                 case "/send message":
@@ -33,6 +34,8 @@ public class Client {
                     socket.close();
                     System.exit(0);
                     break;
+                default:
+                    System.out.print("Comando inválido. Digite um comando válido: ");
             }
         }
    }
