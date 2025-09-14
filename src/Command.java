@@ -8,8 +8,10 @@ public class Command {
     public String getType() {
         var splitString = input.split(" ");
 
-        return splitString[0].startsWith("/users")
-            ? splitString[0] + " " + splitString[1]
-            : splitString[0];
+        if (splitString[0].startsWith("/send") && splitString.length >= 2) {
+            return splitString[0] + " " + splitString[1];
+        }
+
+        return splitString[0];
     }
 }
