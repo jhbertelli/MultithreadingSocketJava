@@ -45,15 +45,9 @@ public class Client extends Thread {
                String commandType = new Command(input)
                    .getType();
 
-               switch (commandType) {
-                   case "/users":
-                   case "/send message":
-                   case "/send file":
-                   case "/sair":
-                       break;
-                   default:
-                       System.out.print("Comando inválido. Digite um comando válido: ");
-                       continue;
+               if (commandType == null) {
+                   System.out.print("Comando inválido. ");
+                   continue;
                }
 
                saida.println(input);

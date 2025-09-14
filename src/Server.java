@@ -48,14 +48,14 @@ public class Server extends Thread {
                     .getType();
 
                 switch (commandType) {
-                    case "/users":
+                    case Command.LIST_USERS:
                         showUsers(saida);
                         break;
-                    case "/send message":
+                    case Command.SEND_MESSAGE:
                         break;
-                    case "/send file":
+                    case Command.SEND_FILE:
                         break;
-                    case "/sair":
+                    case Command.EXIT:
                         handleSocketClosure(socket);
                         break;
                 }
