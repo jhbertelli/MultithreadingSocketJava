@@ -22,4 +22,16 @@ public class Command {
             default -> null;
         };
     }
+
+    public String getDestinatario() {
+        throw new UnsupportedOperationException("A implementar: função getDestinatario");
+    }
+
+    public String getMessage() {
+        throw new UnsupportedOperationException("A implementar: função getMessage");
+    }
+
+    public String getFilePath() {
+        throw new UnsupportedOperationException("A implementar: função getFilePath");
+    }
 }
