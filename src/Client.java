@@ -5,78 +5,77 @@ import java.io.PrintStream;
 import java.net.Socket;
 import java.util.Scanner;
 
-public class Client {
-    public static void main(String[] args) throws IOException, InterruptedException {
+public class Client extends Thread {
+    private final Socket socket;
+    private final PrintStream saida;
+    private final BufferedReader entrada;
+    private final Object serverResponded = new Object();
+
+    public Client(Socket socket) throws IOException {
+        this.socket = socket;
+        saida = new PrintStream(socket.getOutputStream());
+        entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    }
+
+    public static void main(String[] args) throws IOException {
         var socket = new Socket("localhost", 12345);
         System.out.println("Cliente conectado!");
 
-        var teclado = new Scanner(System.in);
-        var saida = new PrintStream(socket.getOutputStream());
-        var entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        new Client(socket).start();
+    }
 
-        System.out.println("Digite seu nome:");
+    public void run() {
+        try {
+            var teclado = new Scanner(System.in);
 
-        String input = teclado.nextLine();
-        saida.println(input);
+            System.out.println("Digite seu nome:");
 
-        Object serverResponded = new Object();
-
-        var clientListener = new Thread(() -> {
-            try {
-                while (true) {
-                    String response = entrada.readLine();
-                    System.out.println(response);
-
-                    if (response.isBlank()) {
-                        synchronized (serverResponded) {
-                            serverResponded.notify();
-                        }
-                    }
-                }
-            } catch (IOException e) {
-                throw new RuntimeException();
-            }
-        });
-
-        clientListener.start();
-
-        showMenu();
-
-        while (!input.equals("/sair")) {
-            System.out.print("Digite um comando: ");
-            input = teclado.nextLine();
-
-            String commandType = new Command(input)
-                .getType();
-
-            switch (commandType) {
-                case "/users":
-                case "/send message":
-                case "/send file":
-                case "/sair":
-                    break;
-                default:
-                    System.out.print("Comando inválido. Digite um comando válido: ");
-                    continue;
-            }
-
+            String input = teclado.nextLine();
             saida.println(input);
 
-            synchronized (serverResponded) {
-                serverResponded.wait();
+            var clientListener = new ClientListener(entrada, serverResponded);
+            clientListener.start();
+
+            showMenu();
+
+            while (!input.equals("/sair")) {
+               System.out.print("Digite um comando: ");
+               input = teclado.nextLine();
+
+               String commandType = new Command(input)
+                   .getType();
+
+               switch (commandType) {
+                   case "/users":
+                   case "/send message":
+                   case "/send file":
+                   case "/sair":
+                       break;
+                   default:
+                       System.out.print("Comando inválido. Digite um comando válido: ");
+                       continue;
+               }
+
+               saida.println(input);
+
+               synchronized (serverResponded) {
+                   serverResponded.wait();
+               }
             }
+
+            saida.close();
+            teclado.close();
+            socket.close();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
         }
+    }
 
-        saida.close();
-        teclado.close();
-        socket.close();
-   }
-
-   private static void showMenu() {
-       System.out.println("Comandos:");
-       System.out.println("/users - Lista todos os usários");
-       System.out.println("/send message <destinatario> <mensagem> - Envia uma mensagem de texto para o destinatário");
-       System.out.println("/send file <destinatario> <caminho do arquivo> - Envia um arquivo para o destinatário");
-       System.out.println("/sair - Termina a sessão e sai do chat");
-   }
+    private static void showMenu() {
+        System.out.println("Comandos:");
+        System.out.println("/users - Lista todos os usários");
+        System.out.println("/send message <destinatario> <mensagem> - Envia uma mensagem de texto para o destinatário");
+        System.out.println("/send file <destinatario> <caminho do arquivo> - Envia um arquivo para o destinatário");
+        System.out.println("/sair - Termina a sessão e sai do chat");
+    }
 }
