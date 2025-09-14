@@ -7,10 +7,14 @@ import java.util.Scanner;
 
 public class Server extends Thread {
     private final Socket socket;
-    private static ArrayList<User> users = new ArrayList<>();
+    private final Scanner entrada;
+    private final PrintStream saida;
+    private final static ArrayList<User> users = new ArrayList<>();
 
-    public Server(final Socket socket) {
+    public Server(final Socket socket) throws IOException {
         this.socket = socket;
+        this.entrada = new Scanner(socket.getInputStream());
+        saida = new PrintStream(socket.getOutputStream());
     }
 
     public static void main(String[] args) throws IOException {
@@ -21,8 +25,13 @@ public class Server extends Thread {
         while (true) {
             var socket = servidor.accept();
 
-            Scanner saida = new Scanner(socket.getInputStream());
-            String nome = saida.nextLine();
+            new Server(socket).start();
+        }
+    }
+
+    public void run() {
+        try {
+            String nome = entrada.nextLine();
 
             System.out.printf(
                 "Conexão estabelecida com o cliente: %s (IP: %s:%d)%n",
@@ -31,15 +40,7 @@ public class Server extends Thread {
                 socket.getPort()
             );
 
-            new Server(socket).start();
             users.add(new User(nome, socket));
-        }
-    }
-
-    public void run() {
-        try {
-            Scanner entrada = new Scanner(socket.getInputStream());
-            PrintStream saida = new PrintStream(socket.getOutputStream());
 
             while (entrada.hasNextLine()) {
                 String input = entrada.nextLine();
@@ -49,24 +50,23 @@ public class Server extends Thread {
 
                 switch (commandType) {
                     case Command.LIST_USERS:
-                        showUsers(saida);
+                        showUsers();
                         break;
                     case Command.SEND_MESSAGE:
                         break;
                     case Command.SEND_FILE:
                         break;
                     case Command.EXIT:
-                        handleSocketClosure(socket);
-                        break;
+                        handleSocketClosure();
+                        return;
                 }
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
-    private void showUsers(PrintStream saida) {
+    private void showUsers() {
         var output = new StringBuilder("Usuários conectados:\n");
 
         for (User user : users) {
@@ -78,13 +78,15 @@ public class Server extends Thread {
         saida.println(output);
     }
 
-    private void handleSocketClosure(Socket socket) throws IOException {
+    private void handleSocketClosure() throws IOException {
         var user = users.stream()
             .filter(u -> u.getSocket().equals(socket))
             .findFirst()
             .get();
 
         socket.close();
+        entrada.close();
+        saida.close();
 
         System.out.printf(
             "Conexão encerrada com o cliente: %s (IP: %s:%d)%n",

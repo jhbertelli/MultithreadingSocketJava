@@ -11,38 +11,40 @@ public class Client extends Thread {
     private final BufferedReader entrada;
     private final Object serverResponded = new Object();
 
-    public Client(Socket socket) throws IOException {
+    public Client(Socket socket, PrintStream saida) throws IOException {
         this.socket = socket;
-        saida = new PrintStream(socket.getOutputStream());
+        this.saida = saida;
         entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
     }
 
     public static void main(String[] args) throws IOException {
-        var socket = new Socket("localhost", 12345);
-        System.out.println("Cliente conectado!");
+        String nome = getNome();
 
-        new Client(socket).start();
+        var socket = new Socket("localhost", 12345);
+
+        var saida = new PrintStream(socket.getOutputStream());
+        saida.println(nome);
+
+        new Client(socket, saida).start();
+        System.out.println("Cliente conectado!");
     }
 
     public void run() {
         try {
             var teclado = new Scanner(System.in);
 
-            System.out.println("Digite seu nome:");
-
-            String input = teclado.nextLine();
-            saida.println(input);
-
             var clientListener = new ClientListener(entrada, serverResponded);
             clientListener.start();
 
             showMenu();
 
-            while (!input.equals("/sair")) {
-               System.out.print("Digite um comando: ");
-               input = teclado.nextLine();
+            String userInput = "";
 
-               String commandType = new Command(input)
+            while (!userInput.equals("/sair")) {
+               System.out.print("Digite um comando: ");
+               userInput = teclado.nextLine();
+
+               String commandType = new Command(userInput)
                    .getType();
 
                if (commandType == null) {
@@ -50,7 +52,7 @@ public class Client extends Thread {
                    continue;
                }
 
-               saida.println(input);
+               saida.println(userInput);
 
                synchronized (serverResponded) {
                    serverResponded.wait();
@@ -71,5 +73,19 @@ public class Client extends Thread {
         System.out.println("/send message <destinatario> <mensagem> - Envia uma mensagem de texto para o destinatário");
         System.out.println("/send file <destinatario> <caminho do arquivo> - Envia um arquivo para o destinatário");
         System.out.println("/sair - Termina a sessão e sai do chat");
+    }
+
+    private static String getNome() {
+        System.out.print("Digite seu nome: ");
+
+        Scanner scanner = new Scanner(System.in);
+        String nome = scanner.nextLine();
+
+        while (nome.isBlank()) {
+            System.out.print("Seu nome não pode ser vazio. Por favor, digite um nome: ");
+            nome = scanner.nextLine();
+        }
+
+        return nome;
     }
 }
