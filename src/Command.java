@@ -12,26 +12,69 @@ public class Command {
 
     public String getType() {
         var splitString = input.split(" ");
+        
+        if (splitString.length > 1 && splitString[0].equals("/send")) {
+            return splitString[0] + " " + splitString[1];
+        } else if (splitString.length > 0) {
+            return splitString[0];
+        }
 
-        String type = splitString[0].startsWith("/send") && splitString.length >= 2
-            ? splitString[0] + " " + splitString[1]
-            : splitString[0];
-
-        return switch (type) {
-            case LIST_USERS, SEND_MESSAGE, SEND_FILE, EXIT -> type;
-            default -> null;
-        };
+        return null;
+        
+//      String type = splitString[0].startsWith("/send") && splitString.length >= 2
+//      ? splitString[0] + " " + splitString[1]
+//      : splitString[0];
+//
+//  return switch (type) {
+//      case LIST_USERS, SEND_MESSAGE, SEND_FILE, EXIT -> type;
+//      default -> null;
+//  };
     }
 
     public String getDestinatario() {
-        throw new UnsupportedOperationException("A implementar: função getDestinatario");
+        var type = getType();
+        var splitString = input.split(" ", 4);
+
+        if (type == null) {
+            return null;
+        }
+
+        if (type.equals(SEND_MESSAGE) || type.equals(SEND_FILE)) {
+            if (splitString.length >= 3) {
+                return splitString[2];
+            }
+        }
+        
+        return null;
     }
 
     public String getMessage() {
-        throw new UnsupportedOperationException("A implementar: função getMessage");
+        var type = getType();
+        var splitString = input.split(" ", 4);
+
+        if (type == null) {
+            return null;
+        }
+
+        if (type.equals(SEND_MESSAGE) && splitString.length >= 4) {
+            return splitString[3];
+        }
+
+        return null;
     }
 
     public String getFilePath() {
-        throw new UnsupportedOperationException("A implementar: função getFilePath");
+        var type = getType();
+        var splitString = input.split(" ", 4);
+
+        if (type == null) {
+            return null;
+        }
+
+        if (type.equals(SEND_FILE) && splitString.length >= 4) {
+            return splitString[3];
+        }
+
+        return null;
     }
 }
