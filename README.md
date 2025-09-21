@@ -1,3 +1,7 @@
+# Trabalho 1: Multithreading e Sockets
+
+**Integrantes:** João H. Bertelli, José A. Fernandes, Pedro J. B. Herculano e Vinycius A. Zeferino 
+
 # Como rodar o projeto no terminal
 
 Para compilar, deve ser enviado o comando abaixo estando na raíz do projeto:
