@@ -37,8 +37,8 @@ public class ClientListener extends Thread {
                     String[] parts = response.split(" ");
                     String remetente = parts[1];
                     String nomeArquivo = parts[2];
-                    
-                    System.out.println("Recebendo arquivo de " + remetente + ": " + nomeArquivo);
+
+                    System.out.printf("[ARQUIVO] <%s>: %s%n", remetente, nomeArquivo);
 
                     try (FileOutputStream fileOut = new FileOutputStream(nomeArquivo)) {
                         byte[] buffer = new byte[8192];

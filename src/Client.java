@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.Scanner;
 
 public class Client extends Thread {
@@ -8,22 +9,24 @@ public class Client extends Thread {
     private final PrintStream saida;
     private final BufferedReader entrada;
     private final Object serverResponded = new Object();
+    private final String nomeUsuario;
 
-    public Client(Socket socket, PrintStream saida) throws IOException {
+    public Client(Socket socket, PrintStream saida, String nomeUsuario) throws IOException {
         this.socket = socket;
         this.saida = saida;
         entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.nomeUsuario = nomeUsuario;
     }
 
     public static void main(String[] args) throws IOException {
-        String nome = getNome();
+        String nomeUsuario = getNome();
 
         var socket = new Socket("localhost", 12345);
 
         var saida = new PrintStream(socket.getOutputStream());
-        saida.println(nome);
+        saida.println(nomeUsuario);
 
-        new Client(socket, saida).start();
+        new Client(socket, saida, nomeUsuario).start();
         System.out.println("Cliente conectado!");
     }
 
@@ -39,15 +42,30 @@ public class Client extends Thread {
             String userInput = "";
 
             while (!userInput.equals(Command.EXIT)) {
-               System.out.print("Digite um comando: ");
                userInput = teclado.nextLine();
 
                Command command = new Command(userInput);
                String commandType = command.getType();
 
                if (commandType == null) {
-                   System.out.print("Comando inválido. ");
+                   System.out.println("Comando inválido. ");
                    continue;
+               }
+
+               if (Command.SEND_MESSAGE.equals(commandType)) {
+                   String destinatario = command.getDestinatario();
+                   String mensagem = command.getMessage();
+
+                   if (destinatario == null || mensagem == null) {
+                       //formato inváilo, devolve uma mensagem de aviso
+                       System.out.println("Comando " + Command.SEND_MESSAGE + " inválido. Formato: /send message <destinatario> <mensagem>" );
+                       continue;
+                   }
+
+                   if (Objects.equals(destinatario, nomeUsuario)) {
+                       System.out.println("Não é possível enviar uma mensagem para si mesmo.");
+                       continue;
+                   }
                }
 
                // envio de aquivos
@@ -56,6 +74,11 @@ public class Client extends Thread {
                    String filePath = command.getFilePath();
 
                    if (destinatario != null && filePath != null) {
+                       if (destinatario.equals(nomeUsuario)) {
+                           System.out.println("Não é possível enviar um arquivo para si mesmo.");
+                           continue;
+                       }
+
                        File file = new File(filePath);
 
                        if (!file.exists() || !file.isFile()) {
@@ -87,7 +110,7 @@ public class Client extends Thread {
                            dos.flush();
 
                            aguardarRespostaServidor();
-                           System.out.println("Arquivo " + file.getName() + " enviado para " + destinatario);
+                           System.out.println("Arquivo " + file.getName() + " enviado para " + destinatario + "!");
                        }
                    } else {
                        //mensagem de erro do formato!

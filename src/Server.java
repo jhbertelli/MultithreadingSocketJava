@@ -102,19 +102,15 @@ public class Server extends Thread {
         String destinatario = command.getDestinatario();
         String mensagem = command.getMessage();
 
-        if (destinatario != null && mensagem != null) {
-            User destinatarioUser = findUser(destinatario); //metodo implementado no final do bloco
+        User destinatarioUser = findUser(destinatario); //metodo implementado no final do bloco
 
-            if (destinatarioUser != null) {
-                PrintStream saidaDestinatario = new PrintStream(destinatarioUser.getSocket().getOutputStream());
-                saidaDestinatario.printf("[%s]: %s%n", user.getUsername(), mensagem);
-            } else {
-                //Se o destinatário não for encontrado devolve uma mensagem de aviso
-                saida.println("Usuário não encontrado: " + destinatario);
-            }
+        if (destinatarioUser != null) {
+            PrintStream saidaDestinatario = new PrintStream(destinatarioUser.getSocket().getOutputStream());
+            saidaDestinatario.printf("[MENSAGEM] <%s>: %s%n", user.getUsername(), mensagem);
+            saida.println("Mensagem enviada!");
         } else {
-            //formato inváilo, devolve uma mensagem de aviso
-            saida.println("Comando " + Command.SEND_MESSAGE + " inválido. Formato: /send message <destinatario> <mensagem>" );
+            //Se o destinatário não for encontrado devolve uma mensagem de aviso
+            saida.println("Usuário não encontrado: " + destinatario);
         }
 
         saida.println(ServerOperations.END_OF_OPERATION);

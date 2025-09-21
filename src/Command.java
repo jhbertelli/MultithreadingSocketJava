@@ -13,14 +13,6 @@ public class Command {
     public String getType() {
         var splitString = input.split(" ");
 
-        //        if (splitString.length > 1 && splitString[0].equals("/send")) {
-        //            return splitString[0] + " " + splitString[1];
-        //        } else if (splitString.length > 0) {
-        //            return splitString[0];
-        //        }
-        //
-        //        return null;
-
         String type = splitString[0].startsWith("/send") && splitString.length >= 2
           ? splitString[0] + " " + splitString[1]
           : splitString[0];
