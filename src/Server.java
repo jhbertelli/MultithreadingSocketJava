@@ -122,38 +122,40 @@ public class Server extends Thread {
 
         User userDestinatario = findUser(destinatarioArquivo);
 
-        if (userDestinatario != null) {
-            // mensagem de arquivo a caminho!
-            var saidaDestinatario = new DataOutputStream(new BufferedOutputStream(userDestinatario.getSocket().getOutputStream()));
-            var entradaRemetente = new DataInputStream(new BufferedInputStream(user.getSocket().getInputStream()));
-
-            saidaDestinatario.write(String.format("%s %s %s\n", ServerOperations.RECIEVING_FILE, user.getUsername(), nomeArquivo).getBytes(StandardCharsets.UTF_8));
-            saidaDestinatario.flush();
-
-            //roteando os bytes
-            try {
-                byte[] buffer = new byte[8192];
-
-                // envia o tamanho do arquivo
-                int fileSize = entradaRemetente.readInt();
-                saidaDestinatario.writeInt(fileSize);
-                saidaDestinatario.flush();
-
-                int bytesRead = entradaRemetente.read(buffer);
-
-                // envia o arquivo
-                saidaDestinatario.write(buffer, 0, bytesRead);
-                saidaDestinatario.flush();
-
-                // mensagem fim do envio !
-                System.out.println("Arquivo " + nomeArquivo + " roteado com sucesso para " + destinatarioArquivo);
-            } catch (IOException e) {
-                //mensagem de erro de roteamento
-                System.err.println("Erro durante o roteamento do arquivo: " + e.getMessage());
-            }
-        } else {
+        if (userDestinatario == null) {
             //mensagem erro: usuário não encontrado
             saida.println("Usuário não encontrado: " + destinatarioArquivo);
+            saida.println(ServerOperations.END_OF_OPERATION);
+            return;
+        }
+
+        // mensagem de arquivo a caminho!
+        var saidaDestinatario = new DataOutputStream(new BufferedOutputStream(userDestinatario.getSocket().getOutputStream()));
+        var entradaRemetente = new DataInputStream(new BufferedInputStream(user.getSocket().getInputStream()));
+
+        saidaDestinatario.write(String.format("%s %s %s\n", ServerOperations.RECIEVING_FILE, user.getUsername(), nomeArquivo).getBytes(StandardCharsets.UTF_8));
+        saidaDestinatario.flush();
+
+        //roteando os bytes
+        try {
+            byte[] buffer = new byte[8192];
+
+            // envia o tamanho do arquivo
+            int fileSize = entradaRemetente.readInt();
+            saidaDestinatario.writeInt(fileSize);
+            saidaDestinatario.flush();
+
+            int bytesRead = entradaRemetente.read(buffer);
+
+            // envia o arquivo
+            saidaDestinatario.write(buffer, 0, bytesRead);
+            saidaDestinatario.flush();
+
+            // mensagem fim do envio !
+            System.out.println("Arquivo " + nomeArquivo + " roteado com sucesso para " + destinatarioArquivo);
+        } catch (IOException e) {
+            //mensagem de erro de roteamento
+            System.err.println("Erro durante o roteamento do arquivo: " + e.getMessage());
         }
 
         saida.println(ServerOperations.END_OF_OPERATION);
