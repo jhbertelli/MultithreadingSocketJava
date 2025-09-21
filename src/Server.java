@@ -144,10 +144,14 @@ public class Server extends Thread {
             saidaDestinatario.writeInt(fileSize);
             saidaDestinatario.flush();
 
-            int bytesRead = entradaRemetente.read(buffer);
-
-            // envia o arquivo
-            saidaDestinatario.write(buffer, 0, bytesRead);
+            // lê os bytes do arquivo e envia-os para o destinatário
+            int totalRead = 0;
+            while (totalRead < fileSize) {
+                int bytesRead = entradaRemetente.read(buffer, 0, Math.min(buffer.length, fileSize - totalRead));
+                if (bytesRead < 0) break;
+                saidaDestinatario.write(buffer, 0, bytesRead);
+                totalRead += bytesRead;
+            }
             saidaDestinatario.flush();
 
             // mensagem fim do envio !
