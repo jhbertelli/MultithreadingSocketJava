@@ -1,17 +1,13 @@
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 public class Client extends Thread {
     private final Socket socket;
     private final PrintStream saida;
     private final BufferedReader entrada;
-//    private final Object serverResponded = new Object();
+    private final Object serverResponded = new Object();
 
     public Client(Socket socket, PrintStream saida) throws IOException {
         this.socket = socket;
@@ -35,80 +31,88 @@ public class Client extends Thread {
         try {
             var teclado = new Scanner(System.in);
 
-//            var clientListener = new ClientListener(entrada, saida); //alterado
-            var clientListener = new ClientListener(socket);
+            var clientListener = new ClientListener(socket, serverResponded);
             clientListener.start();
 
             showMenu();
 
             String userInput = "";
 
-            while (!userInput.equals("/sair")) {
+            while (!userInput.equals(Command.EXIT)) {
                System.out.print("Digite um comando: ");
                userInput = teclado.nextLine();
-               
-//               String commandType = new Command(userInput)
-//                   .getType();
-               
+
                Command command = new Command(userInput);
                String commandType = command.getType();
-               
-//               if (commandType == null) {
-//                   System.out.print("Comando inválido. ");
-//                   continue;
-//               }
-//
-//               saida.println(userInput);
-//
-//               synchronized (serverResponded) {
-//                   serverResponded.wait();
-//               }
-//            }
-               
-           // envio de aquivos
-               
-           if (Command.SEND_FILE.equals(commandType)) {
-               String destinatario = command.getDestinatario();
-               String filePath = command.getFilePath();
 
-               if (destinatario != null && filePath != null) {
-                   File file = new File(filePath);
-                   if (!file.exists() || !file.isFile()) {
-                       System.out.println("Erro: Arquivo não encontrado ou inválido.");
-                       continue;
-                   }
+               if (commandType == null) {
+                   System.out.print("Comando inválido. ");
+                   continue;
+               }
 
-                   // mensagem de aviso!
-                   saida.println(String.format("%s %s %s", Command.SEND_FILE, destinatario, file.getName()));
-                   
-                   try (FileInputStream fileIn = new FileInputStream(file)) {
-                       byte[] buffer = new byte[8192];
-                       int bytesRead;
-                       while ((bytesRead = fileIn.read(buffer)) != -1) {
-                           socket.getOutputStream().write(buffer, 0, bytesRead);
+               // envio de aquivos
+               if (Command.SEND_FILE.equals(commandType)) {
+                   String destinatario = command.getDestinatario();
+                   String filePath = command.getFilePath();
+
+                   if (destinatario != null && filePath != null) {
+                       File file = new File(filePath);
+
+                       if (!file.exists() || !file.isFile()) {
+                           System.out.println("Erro: Arquivo não encontrado ou inválido.");
+                           continue;
                        }
-                       
-                       //fim do arquivo 
-                       socket.getOutputStream().flush(); 
-                       System.out.println("Arquivo " + file.getName() + " enviado para " + destinatario);
-                   }
-               } else {
-            	   //mensagem de erro do formato!
-                   System.out.println("Comando /send file inválido. Formato: /send file <destinatario> <caminho do arquivo>");
+
+                       // mensagem de aviso!
+//                       saida.flush();
+                       try (FileInputStream fileIn = new FileInputStream(file)) {
+                           byte[] buffer = new byte[8192];
+                           int fileSize = (int) file.length();
+
+                           DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+
+                           // envia mensagem de arquivo a caminho
+                           dos.write(String.format("%s %s %s\n", Command.SEND_FILE, destinatario, file.getName()).getBytes(StandardCharsets.UTF_8));
+                           dos.flush();
+
+                           // envia o tamanho do arquivo
+                           dos.writeInt(fileSize);
+                           dos.flush();
+
+                           // envia o arquivo
+                           int bytesRead;
+                           while ((bytesRead = fileIn.read(buffer)) != -1) {
+                               dos.write(buffer, 0, bytesRead);
+                           }
+                           dos.flush();
+
+                           aguardarRespostaServidor();
+                           System.out.println("Arquivo " + file.getName() + " enviado para " + destinatario);
+                       }
+                   } else {
+                       //mensagem de erro do formato!
+                       System.out.println("Comando /send file inválido. Formato: /send file <destinatario> <caminho do arquivo>");
                    }
                } else {
                    saida.println(userInput);
+                   saida.flush();
+                   aguardarRespostaServidor();
                }
            }
 
            saida.close();
            teclado.close();
            socket.close();
-       } catch (IOException e) {
+       } catch (IOException | InterruptedException e) {
            throw new RuntimeException(e);
        }
-   }     
+    }
 
+    private void aguardarRespostaServidor() throws InterruptedException {
+        synchronized (serverResponded) {
+            serverResponded.wait();
+        }
+    }
 
     private static void showMenu() {
         System.out.println("Comandos:");

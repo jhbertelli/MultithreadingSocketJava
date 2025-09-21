@@ -1,21 +1,19 @@
-import java.io.BufferedReader;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.Socket;
 
 public class ClientListener extends Thread {
     private final BufferedReader entrada;
-//    private final Object serverResponded;
+    private final Object serverResponded;
     private final Socket socket;
     
 //    public ClientListener(BufferedReader entrada, Object serverResponded) {
 //        this.entrada = entrada;
 //        this.serverResponded = serverResponded;
     
-    public ClientListener(Socket socket) throws IOException {
+    public ClientListener(Socket socket, Object serverResponded) throws IOException {
         this.socket = socket;
         this.entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.serverResponded = serverResponded;
     }
 
     public void run() {
@@ -23,21 +21,19 @@ public class ClientListener extends Thread {
             while (true) {
                 String response = entrada.readLine();
 
-//                if (response == null || response.isBlank()) {
-//                    synchronized (serverResponded) {
-//                        serverResponded.notify();
-//                    }
                 if (response == null) {
+                    notificarServidorRespondeu();
                     System.out.println("Conexão com o servidor perdida.");
                     break;
                 }
-//                if (response == null) break;
-//                System.out.println(response);
-                
-                
+
+                if (response.equals(ServerOperations.END_OF_OPERATION)) {
+                    notificarServidorRespondeu();
+                    continue;
+                }
+
                 //inicio da implemtação da lógica para receber arquivos
-                
-                if (response.startsWith("RECEBENDO_ARQUIVO")) {
+                if (response.startsWith(ServerOperations.RECIEVING_FILE)) {
                     String[] parts = response.split(" ");
                     String remetente = parts[1];
                     String nomeArquivo = parts[2];
@@ -46,15 +42,22 @@ public class ClientListener extends Thread {
 
                     try (FileOutputStream fileOut = new FileOutputStream(nomeArquivo)) {
                         byte[] buffer = new byte[8192];
-                        int bytesRead;
-                        
-                        //loop, até parar de enviar dados
-                        while ((bytesRead = socket.getInputStream().read(buffer)) != -1) {
+
+                        var entradaRemetente = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+                        int fileSize = entradaRemetente.readInt();
+
+                        int totalRead = 0;
+
+                        while (totalRead < fileSize) {
+                            int bytesRead = entradaRemetente.read(buffer, 0, Math.min(buffer.length, fileSize - totalRead));
+                            if (bytesRead == -1) break;
                             fileOut.write(buffer, 0, bytesRead);
+                            totalRead += bytesRead;
                         }
+
+                        fileOut.flush();
+                        System.out.println("Transferência de arquivo concluída! Arquivo salvo como: " + nomeArquivo);
                     }
-                    // mensagem de sucesso
-                    System.out.println("Transferência de arquivo concluída! Arquivo salvo como: " + nomeArquivo);
                 } else {
                     //se comporta como mensagem de texto
                     System.out.println(response);
@@ -62,6 +65,12 @@ public class ClientListener extends Thread {
             }
         } catch (IOException e) {
             throw new RuntimeException();
+        }
+    }
+
+    private void notificarServidorRespondeu() {
+        synchronized (serverResponded) {
+            serverResponded.notify();
         }
     }
 }

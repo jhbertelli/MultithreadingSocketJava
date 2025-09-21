@@ -1,29 +1,23 @@
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Scanner;
 
 public class Server extends Thread {
-    private final Socket socket;
     private final Scanner entrada;
     private final PrintStream saida;
-    private final String username; //adicionado
+    private final User user;
     private final static ArrayList<User> users = new ArrayList<>();
     
     //alterado para pegar o nome do usuário, como esta na main
-    public Server(final Socket socket, String username) throws IOException {
-        this.socket = socket;
-        this.entrada = new Scanner(socket.getInputStream());
-        saida = new PrintStream(socket.getOutputStream());
-        this.username = username;
+    public Server(User user) throws IOException {
+        this.user = user;
+        this.entrada = new Scanner(user.getSocket().getInputStream());
+        saida = new PrintStream(user.getSocket().getOutputStream());
     }
 
     public static void main(String[] args) throws IOException {
@@ -54,123 +48,119 @@ public class Server extends Thread {
             
             //antes de fazer a thread, será feito a leitura do nome, e depois executar os commandos
             Scanner clienteEntrada = new Scanner(socket.getInputStream());
-            PrintStream clienteSaida = new PrintStream(socket.getOutputStream());
             String nome = clienteEntrada.nextLine();
 
-            users.add(new User(nome, socket));
-            
-//          new Server(socket).start();
-            new Server(socket, nome).start();
+            var user = new User(nome, socket);
+
+            users.add(user);
+
+            new Server(user).start();
         }
     }
 
     public void run() {
         try {
-//            String nome = entrada.nextLine();
-        		System.out.printf(
-                "Conexão estabelecida com o cliente: %s (IP: %s:%d)%n",this.username,
+            var socket = user.getSocket();
+
+            System.out.printf(
+                "Conexão estabelecida com o cliente: %s (IP: %s:%d)%n", user.getUsername(),
                 socket.getInetAddress().getHostAddress(),
                 socket.getPort()
             );
-//            users.add(new User(nome, socket));
+
             while (entrada.hasNextLine()) {
                 String input = entrada.nextLine();
-                
-                //alterado
-                Command command = new Command(input);
-                String commandType = command.getType();
 
-                switch (commandType) {
+                Command command = new Command(input);
+
+                switch (command.getType()) {
                     case Command.LIST_USERS:
                         showUsers();
                         break;
-                        
-                        //implementando envio de mensagem
+
                     case Command.SEND_MESSAGE:
-                        String destinatario = command.getDestinatario();
-                        String mensagem = command.getMessage();
-                        
-                        if (destinatario != null && mensagem != null) {
-                        	User destinatarioUser = findUser(destinatario); //metodo implementado no final do bloco
-                            
-////                        	 Percorre a lista de usuários para encontrar o destinatário
-////                            User destinatarioUser = null;
-//                        	
-//                            for (User user : users) {
-//                                if (user.getUsername().equalsIgnoreCase(destinatario)) {
-//                                    destinatarioUser = user;
-//                                    break;
-//                                }
-//                            }
-
-                            // destinatário encontrado
-                        	
-                            if (destinatarioUser != null) {
-                                PrintStream saidaDestinatario = new PrintStream(destinatarioUser.getSocket().getOutputStream());
-                                saidaDestinatario.println(String.format("[%s]: %s", this.username, mensagem));
-                            } else {
-                                //Se o destinatário não for encontrado devolve uma mensagem de aviso
-                                saida.println("Usuário não encontrado: " + destinatario);
-                            }
-                        } else {
-                        	//formato inváilo, devolve uma mensagem de aviso
-                            saida.println("Comando " + Command.SEND_MESSAGE + " inválido. Formato: /send message <destinatario> <mensagem>" );
-                        }
+                        sendMessage(command);
                         break;
-                        //fim da implemntação de mensagem
-                     
-                     //implementação da logica do envio de arquivos - o mais complexo
+
                     case Command.SEND_FILE:
-                    	
-                    	String destinatarioArquivo = command.getDestinatario();
-                        String nomeArquivo = command.getFilePath();
-
-                        User destinatarioUser = findUser(destinatarioArquivo);
-
-                        if (destinatarioUser != null) {
-                            // mensagem de arquivo a caminho!
-                            PrintStream saidaDestinatario = new PrintStream(destinatarioUser.getSocket().getOutputStream());
-                            saidaDestinatario.println(String.format("RECEBENDO_ARQUIVO %s %s", this.username, nomeArquivo));
-                            
-                            //roteando os bytes
-                            try (InputStream remetenteIn = socket.getInputStream();
-                                 OutputStream destinatarioOut = destinatarioUser.getSocket().getOutputStream()) {
-                                
-                                byte[] buffer = new byte[8192];
-                                int bytesRead;
-
-                                while ((bytesRead = remetenteIn.read(buffer)) != -1) {
-                                    destinatarioOut.write(buffer, 0, bytesRead);
-                                }
-
-                                // mensagem fim do envio !
-                                saidaDestinatario.println("FIM_ARQUIVO");
-                                System.out.println("Arquivo " + nomeArquivo + " roteado com sucesso para " + destinatarioArquivo);
-
-                            } catch (IOException e) {
-                            	//mensagem de erro de roteamento
-                                System.err.println("Erro durante o roteamento do arquivo: " + e.getMessage());
-                            }
-                        } else {
-                        	//mensagem erro: usuário não encontrado
-                            saida.println("Usuário não encontrado: " + destinatarioArquivo);
-                        }
+                        sendFile(command);
                         break;
-                        //Fim da implmentação do envio de arquivos
-                        
+
                     case Command.EXIT:
                         handleSocketClosure();
                         return;
-                    default:
-                        saida.println("Comando inválido. Digite /users, /send message ou /sair.");
-                        break;
                 }
             }
         } catch (IOException e) {
         	//alterado
-        	System.err.println("Erro na comunicação com o cliente: " + this.username);
+        	System.err.println("Erro na comunicação com o cliente: " + user.getUsername());
             handleSocketClosure();
         }
+    }
+
+    private void sendMessage(Command command) throws IOException {
+        String destinatario = command.getDestinatario();
+        String mensagem = command.getMessage();
+
+        if (destinatario != null && mensagem != null) {
+            User destinatarioUser = findUser(destinatario); //metodo implementado no final do bloco
+
+            if (destinatarioUser != null) {
+                PrintStream saidaDestinatario = new PrintStream(destinatarioUser.getSocket().getOutputStream());
+                saidaDestinatario.printf("[%s]: %s%n", user.getUsername(), mensagem);
+            } else {
+                //Se o destinatário não for encontrado devolve uma mensagem de aviso
+                saida.println("Usuário não encontrado: " + destinatario);
+            }
+        } else {
+            //formato inváilo, devolve uma mensagem de aviso
+            saida.println("Comando " + Command.SEND_MESSAGE + " inválido. Formato: /send message <destinatario> <mensagem>" );
+        }
+
+        saida.println(ServerOperations.END_OF_OPERATION);
+    }
+
+    private void sendFile(Command command) throws IOException {
+        String destinatarioArquivo = command.getDestinatario();
+        String nomeArquivo = command.getFilePath();
+
+        User userDestinatario = findUser(destinatarioArquivo);
+
+        if (userDestinatario != null) {
+            // mensagem de arquivo a caminho!
+            var saidaDestinatario = new DataOutputStream(new BufferedOutputStream(userDestinatario.getSocket().getOutputStream()));
+            var entradaRemetente = new DataInputStream(new BufferedInputStream(user.getSocket().getInputStream()));
+
+            saidaDestinatario.write(String.format("%s %s %s\n", ServerOperations.RECIEVING_FILE, user.getUsername(), nomeArquivo).getBytes(StandardCharsets.UTF_8));
+            saidaDestinatario.flush();
+
+            //roteando os bytes
+            try {
+                byte[] buffer = new byte[8192];
+
+                // envia o tamanho do arquivo
+                int fileSize = entradaRemetente.readInt();
+                saidaDestinatario.writeInt(fileSize);
+                saidaDestinatario.flush();
+
+                int bytesRead = entradaRemetente.read(buffer);
+
+                // envia o arquivo
+                saidaDestinatario.write(buffer, 0, bytesRead);
+                saidaDestinatario.flush();
+
+                // mensagem fim do envio !
+                System.out.println("Arquivo " + nomeArquivo + " roteado com sucesso para " + destinatarioArquivo);
+            } catch (IOException e) {
+                //mensagem de erro de roteamento
+                System.err.println("Erro durante o roteamento do arquivo: " + e.getMessage());
+            }
+        } else {
+            //mensagem erro: usuário não encontrado
+            saida.println("Usuário não encontrado: " + destinatarioArquivo);
+        }
+
+        saida.println(ServerOperations.END_OF_OPERATION);
     }
 
     private void showUsers() {
@@ -182,60 +172,36 @@ public class Server extends Thread {
                 .append("\n");
         }
 
-        saida.println(output);
+        saida.print(output);
+        saida.println(ServerOperations.END_OF_OPERATION);
     }
-    
+
+    // método para achar usuário
     private User findUser(String username) {
         return users.stream()
-                    .filter(u -> u.getUsername().equalsIgnoreCase(username))
-                    .findFirst()
-                    .orElse(null);
+            .filter(u -> u.getUsername().equalsIgnoreCase(username))
+            .findFirst()
+            .orElse(null);
     }
 
-    private void handleSocketClosure() {          //throws IOException {
-    	
+    private void handleSocketClosure() {
     	try {
-            
-            var userToRemove = users.stream()
-                .filter(u -> u.getUsername().equals(this.username))
-                .findFirst()
-                .orElse(null);
+            var socket = user.getSocket();
 
-            if (userToRemove != null) {
-                users.remove(userToRemove);
-                System.out.printf(
-                    "Conexão encerrada com o cliente: %s (IP: %s:%d)%n",
-                    userToRemove.getUsername(),
-                    socket.getInetAddress().getHostAddress(),
-                    socket.getPort()
-                );
-                
-                socket.close();
-                entrada.close();
-                saida.close();
-            }
+            users.remove(user);
+
+            System.out.printf(
+                "Conexão encerrada com o cliente: %s (IP: %s:%d)%n",
+                user.getUsername(),
+                socket.getInetAddress().getHostAddress(),
+                socket.getPort()
+            );
+
+            socket.close();
+            entrada.close();
+            saida.close();
         } catch (IOException e) {
             System.err.println("Erro ao fechar a conexão.");
         }
-    	
-//        var user = users.stream()
-//            .filter(u -> u.getSocket().equals(socket))
-//            .findFirst()
-//            .get();
-//
-//        socket.close();
-//        entrada.close();
-//        saida.close();
-//
-//        System.out.printf(
-//            "Conexão encerrada com o cliente: %s (IP: %s:%d)%n",
-//            user.getUsername(),
-//            socket.getInetAddress().getHostAddress(),
-//            socket.getPort()
-//        );
-//      users.remove(user);
-    	
     }
-    
-    // método para achar usuário
 }
