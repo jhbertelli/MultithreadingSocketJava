@@ -90,6 +90,8 @@ public class Server extends Thread {
                         handleSocketClosure();
                         return;
                 }
+
+                saida.println(ServerOperations.END_OF_OPERATION);
             }
         } catch (IOException e) {
         	//alterado
@@ -112,8 +114,6 @@ public class Server extends Thread {
             //Se o destinatário não for encontrado devolve uma mensagem de aviso
             saida.println("Usuário não encontrado: " + destinatario);
         }
-
-        saida.println(ServerOperations.END_OF_OPERATION);
     }
 
     private void sendFile(Command command) throws IOException {
@@ -125,20 +125,19 @@ public class Server extends Thread {
         if (userDestinatario == null) {
             //mensagem erro: usuário não encontrado
             saida.println("Usuário não encontrado: " + destinatarioArquivo);
-            saida.println(ServerOperations.END_OF_OPERATION);
             return;
         }
 
-        // mensagem de arquivo a caminho!
         var saidaDestinatario = new DataOutputStream(new BufferedOutputStream(userDestinatario.getSocket().getOutputStream()));
         var entradaRemetente = new DataInputStream(new BufferedInputStream(user.getSocket().getInputStream()));
 
+        // mensagem de arquivo a caminho!
         saidaDestinatario.write(String.format("%s %s %s\n", ServerOperations.RECIEVING_FILE, user.getUsername(), nomeArquivo).getBytes(StandardCharsets.UTF_8));
         saidaDestinatario.flush();
 
         //roteando os bytes
         try {
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[ServerOperations.FILE_MAX_SIZE];
 
             // envia o tamanho do arquivo
             int fileSize = entradaRemetente.readInt();
@@ -158,7 +157,6 @@ public class Server extends Thread {
             System.err.println("Erro durante o roteamento do arquivo: " + e.getMessage());
         }
 
-        saida.println(ServerOperations.END_OF_OPERATION);
     }
 
     private void showUsers() {
@@ -171,7 +169,6 @@ public class Server extends Thread {
         }
 
         saida.print(output);
-        saida.println(ServerOperations.END_OF_OPERATION);
     }
 
     // método para achar usuário

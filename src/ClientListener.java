@@ -41,7 +41,7 @@ public class ClientListener extends Thread {
                     System.out.printf("[ARQUIVO] <%s>: %s%n", remetente, nomeArquivo);
 
                     try (FileOutputStream fileOut = new FileOutputStream(nomeArquivo)) {
-                        byte[] buffer = new byte[8192];
+                        byte[] buffer = new byte[ServerOperations.FILE_MAX_SIZE];
 
                         var entradaRemetente = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
                         int fileSize = entradaRemetente.readInt();

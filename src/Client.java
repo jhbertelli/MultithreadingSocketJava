@@ -86,11 +86,14 @@ public class Client extends Thread {
                            continue;
                        }
 
-                       // mensagem de aviso!
-//                       saida.flush();
                        try (FileInputStream fileIn = new FileInputStream(file)) {
-                           byte[] buffer = new byte[8192];
-                           int fileSize = (int) file.length();
+                           byte[] buffer = new byte[ServerOperations.FILE_MAX_SIZE]; // 5MB
+                           int fileSize = (int)file.length();
+
+                           if (fileSize > ServerOperations.FILE_MAX_SIZE) {
+                               System.out.println("O arquivo escolhido é maior que o limite de 5MB. Tente outro arquivo.");
+                               continue;
+                           }
 
                            DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
@@ -141,7 +144,7 @@ public class Client extends Thread {
         System.out.println("Comandos:");
         System.out.println("/users - Lista todos os usários");
         System.out.println("/send message <destinatario> <mensagem> - Envia uma mensagem de texto para o destinatário");
-        System.out.println("/send file <destinatario> <caminho do arquivo> - Envia um arquivo para o destinatário");
+        System.out.println("/send file <destinatario> <caminho do arquivo> - Envia um arquivo de até 5MB para o destinatário");
         System.out.println("/sair - Termina a sessão e sai do chat");
     }
 
