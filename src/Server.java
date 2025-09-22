@@ -12,7 +12,7 @@ public class Server extends Thread {
     private final PrintStream saida;
     private final User user;
     private final static ArrayList<User> users = new ArrayList<>();
-    
+
     //alterado para pegar o nome do usuário, como esta na main
     public Server(User user) throws IOException {
         this.user = user;
@@ -24,37 +24,45 @@ public class Server extends Thread {
         int port = 12345;
         var servidor = new ServerSocket(port);
         System.out.printf("Servidor iniciado na porta %d!%n", port);
-        
+
         String logFileName = "server.log"; // adicionado
 
         while (true) {
             var socket = servidor.accept();
-            
+
             //implemtação da lógica de log
-            
+
             String clientIP = socket.getInetAddress().getHostAddress();
             LocalDateTime now = LocalDateTime.now();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
             String formattedDateTime = now.format(formatter);
-            
+
             String logEntry = String.format("Conexão estabelecida com IP: %s em %s%n", clientIP, formattedDateTime);
-            
+
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
                 writer.write(logEntry);
             } catch (IOException e) {
-            	//mensagem de erro
+                //mensagem de erro
                 System.err.println("Erro ao escrever no arquivo de log: " + e.getMessage());
             }
-            
+
             //antes de fazer a thread, será feito a leitura do nome, e depois executar os commandos
             Scanner clienteEntrada = new Scanner(socket.getInputStream());
             String nome = clienteEntrada.nextLine();
 
-            var user = new User(nome, socket);
-
-            users.add(user);
-
-            new Server(user).start();
+            // === Lógica de verificação do nome de usuário ===
+            if (findUser(nome) != null) {
+                PrintStream saida = new PrintStream(socket.getOutputStream());
+                saida.println("Nome de usuário já utilizado. Por favor, tente outro.");
+                saida.close();
+                socket.close();
+                System.out.println("Conexão recusada para o usuário '" + nome + "'. Nome já em uso.");
+            } else {
+                var user = new User(nome, socket);
+                users.add(user);
+                System.out.println("Usuário '" + nome + "' conectado com sucesso.");
+                new Server(user).start();
+            }
         }
     }
 
@@ -63,9 +71,9 @@ public class Server extends Thread {
             var socket = user.getSocket();
 
             System.out.printf(
-                "Conexão estabelecida com o cliente: %s (IP: %s:%d)%n", user.getUsername(),
-                socket.getInetAddress().getHostAddress(),
-                socket.getPort()
+                    "Conexão estabelecida com o cliente: %s (IP: %s:%d)%n", user.getUsername(),
+                    socket.getInetAddress().getHostAddress(),
+                    socket.getPort()
             );
 
             while (entrada.hasNextLine()) {
@@ -94,8 +102,8 @@ public class Server extends Thread {
                 saida.println(ServerOperations.END_OF_OPERATION);
             }
         } catch (IOException e) {
-        	//alterado
-        	System.err.println("Erro na comunicação com o cliente: " + user.getUsername());
+            //alterado
+            System.err.println("Erro na comunicação com o cliente: " + user.getUsername());
             handleSocketClosure();
         }
     }
@@ -168,32 +176,32 @@ public class Server extends Thread {
 
         for (User user : users) {
             output
-                .append(user.getUsername())
-                .append("\n");
+                    .append(user.getUsername())
+                    .append("\n");
         }
 
         saida.print(output);
     }
 
-    // método para achar usuário
-    private User findUser(String username) {
+    // método para achar usuário - AGORA ESTÁ ESTÁTICO
+    private static User findUser(String username) {
         return users.stream()
-            .filter(u -> u.getUsername().equalsIgnoreCase(username))
-            .findFirst()
-            .orElse(null);
+                .filter(u -> u.getUsername().equalsIgnoreCase(username))
+                .findFirst()
+                .orElse(null);
     }
 
     private void handleSocketClosure() {
-    	try {
+        try {
             var socket = user.getSocket();
 
             users.remove(user);
 
             System.out.printf(
-                "Conexão encerrada com o cliente: %s (IP: %s:%d)%n",
-                user.getUsername(),
-                socket.getInetAddress().getHostAddress(),
-                socket.getPort()
+                    "Conexão encerrada com o cliente: %s (IP: %s:%d)%n",
+                    user.getUsername(),
+                    socket.getInetAddress().getHostAddress(),
+                    socket.getPort()
             );
 
             socket.close();
