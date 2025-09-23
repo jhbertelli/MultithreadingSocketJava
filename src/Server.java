@@ -30,27 +30,11 @@ public class Server extends Thread {
         while (true) {
             var socket = servidor.accept();
 
-            //implemtação da lógica de log
-
-            String clientIP = socket.getInetAddress().getHostAddress();
-            LocalDateTime now = LocalDateTime.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            String formattedDateTime = now.format(formatter);
-
-            String logEntry = String.format("Conexão estabelecida com IP: %s em %s%n", clientIP, formattedDateTime);
-
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
-                writer.write(logEntry);
-            } catch (IOException e) {
-                //mensagem de erro
-                System.err.println("Erro ao escrever no arquivo de log: " + e.getMessage());
-            }
-
             //antes de fazer a thread, será feito a leitura do nome, e depois executar os commandos
             Scanner clienteEntrada = new Scanner(socket.getInputStream());
             String nome = clienteEntrada.nextLine();
 
-            // === Lógica de verificação do nome de usuário ===
+            // verificação do nome de usuário
             if (findUser(nome) != null) {
                 PrintStream saida = new PrintStream(socket.getOutputStream());
                 saida.println("Nome de usuário já utilizado. Por favor, tente outro.");
@@ -58,9 +42,25 @@ public class Server extends Thread {
                 socket.close();
                 System.out.println("Conexão recusada para o usuário '" + nome + "'. Nome já em uso.");
             } else {
+                // se o nome é único, continua o processo normal
                 var user = new User(nome, socket);
                 users.add(user);
                 System.out.println("Usuário '" + nome + "' conectado com sucesso.");
+
+                // lógica de log movida para cá, depois da verificação ===
+                String clientIP = socket.getInetAddress().getHostAddress();
+                LocalDateTime now = LocalDateTime.now();
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                String formattedDateTime = now.format(formatter);
+
+                String logEntry = String.format("Conexão estabelecida com IP: %s em %s%n", clientIP, formattedDateTime);
+
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
+                    writer.write(logEntry);
+                } catch (IOException e) {
+                    System.err.println("Erro ao escrever no arquivo de log: " + e.getMessage());
+                }
+
                 new Server(user).start();
             }
         }
@@ -119,7 +119,7 @@ public class Server extends Thread {
             saidaDestinatario.printf("[MENSAGEM] <%s>: %s%n", user.getUsername(), mensagem);
             saida.println("Mensagem enviada!");
         } else {
-            //Se o destinatário não for encontrado devolve uma mensagem de aviso
+            //se o destinatário não for encontrado devolve uma mensagem de aviso
             saida.println("Usuário não encontrado: " + destinatario);
         }
     }
