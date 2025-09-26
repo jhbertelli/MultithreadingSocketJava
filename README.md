@@ -22,4 +22,9 @@ Similarmente, estando em qualquer diretório, para rodar o cliente, deve ser env
 java -cp <caminho para a pasta src> Client
 ```
 
-Os arquivos que serão recebidos via mensagem serão salvos no mesmo diretório em que foi executado o comando acima.
+# Envio de arquivos
+
+O caminho do arquivo especificado a ser enviado pode ser o caminho absoluto (ex.: C:\...\arquivo.txt)
+ou o caminho relativo ao diretório em que foi executado o programa do Client remetente.  
+
+Os arquivos a serem recebidos pelo destinatário serão salvos no mesmo diretório em que foi executado o programa do Client destinatário.

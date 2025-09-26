@@ -25,8 +25,6 @@ public class Server extends Thread {
         var servidor = new ServerSocket(port);
         System.out.printf("Servidor iniciado na porta %d!%n", port);
 
-        String logFileName = "server.log"; // adicionado
-
         while (true) {
             var socket = servidor.accept();
 
@@ -34,32 +32,45 @@ public class Server extends Thread {
             Scanner clienteEntrada = new Scanner(socket.getInputStream());
             String nome = clienteEntrada.nextLine();
 
+            String clientIP = socket.getInetAddress().getHostAddress();
+            int clientPort = socket.getPort();
+            String formattedDateTime = LocalDateTime
+                .now()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
             // verificação do nome de usuário
             if (findUser(nome) != null) {
                 PrintStream saida = new PrintStream(socket.getOutputStream());
                 saida.println("Nome de usuário já utilizado. Por favor, tente outro.");
                 saida.close();
                 socket.close();
-                System.out.println("Conexão recusada para o usuário '" + nome + "'. Nome já em uso.");
+
+                String logUsuarioRecusado = String.format(
+                    "[%s] Conexão recusada para o usuário \"%s\" (IP: %s:%d). Nome já em uso.%n",
+                    formattedDateTime,
+                    nome,
+                    clientIP,
+                    clientPort
+                );
+
+                System.out.printf(logUsuarioRecusado);
+                writeLogEntry(logUsuarioRecusado);
             } else {
                 // se o nome é único, continua o processo normal
                 var user = new User(nome, socket);
                 users.add(user);
-                System.out.println("Usuário '" + nome + "' conectado com sucesso.");
 
-                // lógica de log movida para cá, depois da verificação ===
-                String clientIP = socket.getInetAddress().getHostAddress();
-                LocalDateTime now = LocalDateTime.now();
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                String formattedDateTime = now.format(formatter);
+                String logEntradaUsuario = String.format(
+                    "[%s] Conexão estabelecida com o cliente: \"%s\" (IP: %s:%d)%n",
+                    formattedDateTime,
+                    nome,
+                    clientIP,
+                    clientPort
+                );
 
-                String logEntry = String.format("Conexão estabelecida com IP: %s em %s%n", clientIP, formattedDateTime);
+                System.out.printf(logEntradaUsuario);
 
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
-                    writer.write(logEntry);
-                } catch (IOException e) {
-                    System.err.println("Erro ao escrever no arquivo de log: " + e.getMessage());
-                }
+                writeLogEntry(logEntradaUsuario);
 
                 new Server(user).start();
             }
@@ -67,16 +78,10 @@ public class Server extends Thread {
     }
 
     public void run() {
+        boolean exit = false;
+
         try {
-            var socket = user.getSocket();
-
-            System.out.printf(
-                    "Conexão estabelecida com o cliente: %s (IP: %s:%d)%n", user.getUsername(),
-                    socket.getInetAddress().getHostAddress(),
-                    socket.getPort()
-            );
-
-            while (entrada.hasNextLine()) {
+            while (!exit && entrada.hasNextLine()) {
                 String input = entrada.nextLine();
 
                 Command command = new Command(input);
@@ -95,17 +100,18 @@ public class Server extends Thread {
                         break;
 
                     case Command.EXIT:
-                        handleSocketClosure();
-                        return;
+                        exit = true;
+                        break;
                 }
 
-                saida.println(ServerOperations.END_OF_OPERATION);
+                if (!exit) saida.println(ServerOperations.END_OF_OPERATION);
             }
         } catch (IOException e) {
             //alterado
             System.err.println("Erro na comunicação com o cliente: " + user.getUsername());
-            handleSocketClosure();
         }
+        
+        handleSocketClosure();
     }
 
     private void sendMessage(Command command) throws IOException {
@@ -197,18 +203,37 @@ public class Server extends Thread {
 
             users.remove(user);
 
-            System.out.printf(
-                    "Conexão encerrada com o cliente: %s (IP: %s:%d)%n",
-                    user.getUsername(),
-                    socket.getInetAddress().getHostAddress(),
-                    socket.getPort()
+            String formattedDateTime = LocalDateTime
+                .now()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            String logSaidaUsuario = String.format(
+                "[%s] Conexão encerrada com o cliente: \"%s\" (IP: %s:%d)%n",
+                formattedDateTime,
+                user.getUsername(),
+                socket.getInetAddress().getHostAddress(),
+                socket.getPort()
             );
+
+            System.out.printf(logSaidaUsuario);
+
+            writeLogEntry(logSaidaUsuario);
 
             socket.close();
             entrada.close();
             saida.close();
         } catch (IOException e) {
             System.err.println("Erro ao fechar a conexão.");
+        }
+    }
+
+    private static void writeLogEntry(String logEntry) {
+        String logFileName = "server.log"; // adicionado
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFileName, true))) {
+            writer.write(logEntry);
+        } catch (IOException e) {
+            System.err.println("Erro ao escrever no arquivo de log: " + e.getMessage());
         }
     }
 }
