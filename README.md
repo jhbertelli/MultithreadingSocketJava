@@ -24,7 +24,9 @@ java -cp <caminho para a pasta src> Client
 
 # Envio de arquivos
 
-O caminho do arquivo especificado a ser enviado pode ser o caminho absoluto (ex.: C:\...\arquivo.txt)
+O caminho do arquivo especificado a ser enviado pode ser o caminho absoluto
 ou o caminho relativo ao diretório em que foi executado o programa do Client remetente.  
 
 Os arquivos a serem recebidos pelo destinatário serão salvos no mesmo diretório em que foi executado o programa do Client destinatário.
+
+Este trabalho foi feito inteiramente utilizando o sistema operacional Linux.
